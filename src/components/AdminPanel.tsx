@@ -71,9 +71,21 @@ export default function AdminPanel({
     try {
       setAuthError(null);
       await signInWithGoogle();
-    } catch (err) {
-      console.error(err);
-      setAuthError('Gagal melakukan login. Silakan coba lagi.');
+    } catch (err: any) {
+      console.error("Login error details:", err);
+      let customMsg = `Gagal melakukan login: ${err?.code || 'Error tidak dikenal'}. `;
+      if (err?.code === 'auth/unauthorized-domain') {
+        customMsg += 'Domain situs Anda saat ini belum didaftarkan sebagai "Authorized Domains" di Firebase Console Anda. Silakan pergi ke Firebase Console -> Authentication -> Settings -> Authorized Domains lalu tambahkan domain Vercel / domain saat ini.';
+      } else if (err?.code === 'auth/popup-blocked') {
+        customMsg += 'Popup diblokir oleh browser. Silakan berikan izin popup atau buka situs ini langsung bukan melalui iframe.';
+      } else if (err?.code === 'auth/operation-not-allowed') {
+        customMsg += 'Metode masuk "Google" belum diaktifkan di Firebase Console Anda. Silakan masuk ke Firebase Console -> Authentication -> Sign-in Method dan aktifkan Google Provider.';
+      } else if (err?.code === 'auth/network-request-failed') {
+        customMsg += 'Koneksi jaringan gagal atau diblokir oleh ekstensi browser (Adblocker). Nonaktifkan Adblocker Anda.';
+      } else {
+        customMsg += `${err?.message || ''}. Tips: Jika Anda mencobanya di dalam editor AI Studio, silakan buka aplikasi di TAB BARU menggunakan ikon panah di kanan atas preview, atau pastikan Domain Authorized & Google Provider sudah diaktifkan di Firebase Console Anda.`;
+      }
+      setAuthError(customMsg);
     }
   };
 
@@ -178,9 +190,14 @@ export default function AdminPanel({
         await batch.commit();
         showStatus('Seluruh data contoh berhasil disemaikan ke Firestore database!');
         onRefreshData();
-      } catch (error) {
+      } catch (error: any) {
         console.error(error);
-        showStatus('Gagal menyemaikan data. Pastikan Anda masuk sebagai tarzzgg1@gmail.com.', 'error');
+        const errMsg = error?.message || String(error);
+        if (errMsg.includes('unavailable') || errMsg.includes('Could not reach') || errMsg.includes('offline')) {
+          showStatus('Gagal: Firestore belum diaktifkan di Firebase Console "web-ix-d". Masuk ke Firebase Console -> Firestore Database, lalu klik "Create Database"!', 'error');
+        } else {
+          showStatus('Gagal menyemaikan data. Pastikan akun masuk Anda sesuai dan database Firestore Anda sudah diaktifkan.', 'error');
+        }
       } finally {
         setIsSubmitLoading(false);
       }
