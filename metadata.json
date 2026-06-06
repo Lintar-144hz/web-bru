@@ -1,0 +1,6 @@
+{
+  "name": "MyKonten",
+  "description": "Website personal modern premium dengan blog, manajemen proyek, galeri foto dan panel admin",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,140 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // --- Phase 3: Primitive Definitions & Safety Nets ---
+
+    // Global Safety Net default-deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Master authentication check
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Secure Admin Look up: Checks email identity and verification flag
+    function isAdmin() {
+      return isSignedIn() 
+        && request.auth.token.email == "tarzzgg1@gmail.com" 
+        && request.auth.token.email_verified == true;
+    }
+
+    // ID character validation to prevent character injection and Denial of Wallet attacks
+    function isValidId(id) {
+      return id is string 
+        && id.size() <= 128 
+        && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Helper functions for easy input data reference
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- Phase 4: Entity Validators (Blueprints) ---
+
+    // Strict validator for Blog Articles
+    function isValidArticle(data) {
+      return data.keys().hasAll(['title', 'summary', 'content', 'createdAt', 'published'])
+        && data.title is string && data.title.size() >= 3 && data.title.size() <= 200
+        && data.summary is string && data.summary.size() >= 10 && data.summary.size() <= 1000
+        && data.content is string && data.content.size() >= 10 && data.content.size() <= 100000
+        && data.published is bool;
+    }
+
+    // Strict validator for Portfolio Projects
+    function isValidProject(data) {
+      return data.keys().hasAll(['title', 'description', 'createdAt'])
+        && data.title is string && data.title.size() >= 3 && data.title.size() <= 200
+        && data.description is string && data.description.size() >= 10 && data.description.size() <= 5000;
+    }
+
+    // Strict validator for Gallery Cards
+    function isValidGallery(data) {
+      return data.keys().hasAll(['imageUrl', 'caption', 'createdAt'])
+        && data.imageUrl is string && data.imageUrl.size() >= 10 && data.imageUrl.size() <= 2000
+        && data.caption is string && data.caption.size() >= 2 && data.caption.size() <= 1000;
+    }
+
+    // Strict validator for Visitor analytics 
+    function isValidStat(data) {
+      return data.keys().hasAll(['views', 'updatedAt'])
+        && data.views is number;
+    }
+
+
+    // --- Phase 5: Collection Directives & Rules Mapping ---
+
+    // 1. Articles Collection rules
+    match /articles/{articleId} {
+      allow read: if true;
+      
+      allow create: if isAdmin() 
+        && isValidId(articleId) 
+        && isValidArticle(incoming())
+        && incoming().createdAt == request.time;
+        
+      allow update: if isAdmin() 
+        && isValidId(articleId)
+        && isValidArticle(incoming())
+        && incoming().createdAt == existing().createdAt; // createdAt is immutable
+        
+      allow delete: if isAdmin()
+        && isValidId(articleId);
+    }
+
+    // 2. Projects Collection rules
+    match /projects/{projectId} {
+      allow read: if true;
+      
+      allow create: if isAdmin() 
+        && isValidId(projectId) 
+        && isValidProject(incoming())
+        && incoming().createdAt == request.time;
+        
+      allow update: if isAdmin() 
+        && isValidId(projectId)
+        && isValidProject(incoming())
+        && incoming().createdAt == existing().createdAt; // createdAt is immutable
+        
+      allow delete: if isAdmin()
+        && isValidId(projectId);
+    }
+
+    // 3. Gallery Collection rules
+    match /gallery/{galleryId} {
+      allow read: if true;
+      
+      allow create: if isAdmin() 
+        && isValidId(galleryId) 
+        && isValidGallery(incoming())
+        && incoming().createdAt == request.time;
+        
+      allow update: if isAdmin() 
+        && isValidId(galleryId)
+        && isValidGallery(incoming())
+        && incoming().createdAt == existing().createdAt; // createdAt is immutable
+        
+      allow delete: if isAdmin()
+        && isValidId(galleryId);
+    }
+
+    // 4. General Stats Collection rules (supports public page counter increments)
+    match /stats/{statId} {
+      allow read: if true;
+      
+      allow create: if true; // Allows initial setup of counters
+      
+      allow update: if isValidStat(incoming())
+        && incoming().diff(existing()).affectedKeys().hasOnly(['views', 'updatedAt']);
+        
+      allow delete: if isAdmin();
+    }
+  }
+}

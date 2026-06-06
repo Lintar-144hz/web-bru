@@ -1,0 +1,167 @@
+{
+  "entities": {
+    "article": {
+      "title": "Article",
+      "description": "A personal blog article or tech writing",
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "Title of the article"
+        },
+        "summary": {
+          "type": "string",
+          "description": "Short summary/snippet"
+        },
+        "content": {
+          "type": "string",
+          "description": "Full HTML or Markdown content"
+        },
+        "imageUrl": {
+          "type": "string",
+          "description": "Cover image URL"
+        },
+        "author": {
+          "type": "string",
+          "description": "Author of the article"
+        },
+        "category": {
+          "type": "string",
+          "description": "Review, Tech, Life, Tutorial, etc"
+        },
+        "views": {
+          "type": "number",
+          "description": "Number of views"
+        },
+        "published": {
+          "type": "boolean",
+          "description": "Is this article published or still a draft"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the article was created"
+        }
+      },
+      "required": [
+        "title",
+        "summary",
+        "content",
+        "createdAt",
+        "published"
+      ]
+    },
+    "project": {
+      "title": "Project",
+      "description": "Tech projects developed by the owner",
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "Title of the project"
+        },
+        "description": {
+          "type": "string",
+          "description": "Detailed description"
+        },
+        "imageUrl": {
+          "type": "string",
+          "description": "Project cover image"
+        },
+        "tags": {
+          "type": "string",
+          "description": "Comma separated tags or string representation"
+        },
+        "demoUrl": {
+          "type": "string",
+          "description": "Live production preview url"
+        },
+        "githubUrl": {
+          "type": "string",
+          "description": "Source code repository url"
+        },
+        "featured": {
+          "type": "boolean",
+          "description": "Should this project highlight in hero/features"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp"
+        }
+      },
+      "required": [
+        "title",
+        "description",
+        "createdAt"
+      ]
+    },
+    "gallery": {
+      "title": "Gallery Item",
+      "description": "Modern photo gallery element",
+      "type": "object",
+      "properties": {
+        "imageUrl": {
+          "type": "string",
+          "description": "Image hosting URL"
+        },
+        "caption": {
+          "type": "string",
+          "description": "Short explanation of the shot"
+        },
+        "category": {
+          "type": "string",
+          "description": "Category tags"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp"
+        }
+      },
+      "required": [
+        "imageUrl",
+        "caption",
+        "createdAt"
+      ]
+    },
+    "stats": {
+      "title": "Analytics Statistics",
+      "description": "Simple numbers tracking visits",
+      "type": "object",
+      "properties": {
+        "views": {
+          "type": "number",
+          "description": "Total hits on the website homepage"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of the last record update"
+        }
+      },
+      "required": [
+        "views",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/articles/{articleId}": {
+      "schema": "article",
+      "description": "Store all blog posts"
+    },
+    "/projects/{projectId}": {
+      "schema": "project",
+      "description": "Store portfolio projects"
+    },
+    "/gallery/{galleryId}": {
+      "schema": "gallery",
+      "description": "Store gallery images"
+    },
+    "/stats/{statId}": {
+      "schema": "stats",
+      "description": "Store general admin or application analytics counters"
+    }
+  }
+}
