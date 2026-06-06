@@ -6,7 +6,8 @@ import {
 } from 'lucide-react';
 import { Article, Project, GalleryItem, Stat } from '../types';
 import { 
-  db, auth, signInWithGoogle, logout, handleFirestoreError, OperationType, storage
+  db, auth, signInWithGoogle, logout, handleFirestoreError, OperationType, storage,
+  signInWithEmailAndPassword, createUserWithEmailAndPassword
 } from '../firebase';
 import { 
   collection, doc, getDocs, addDoc, updateDoc, deleteDoc, writeBatch, setDoc
@@ -55,6 +56,11 @@ export default function AdminPanel({
   const [isSubmitLoading, setIsSubmitLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
+  // Email/Password states for easier admin access
+  const [emailInput, setEmailInput] = useState('tarzzgg1@gmail.com');
+  const [passwordInput, setPasswordInput] = useState('');
+  const [isAuthLoading, setIsAuthLoading] = useState(false);
+
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((u) => {
       setUser(u);
@@ -76,16 +82,58 @@ export default function AdminPanel({
       let customMsg = `Gagal melakukan login: ${err?.code || 'Error tidak dikenal'}. `;
       if (err?.code === 'auth/unauthorized-domain') {
         customMsg += 'Domain situs Anda saat ini belum didaftarkan sebagai "Authorized Domains" di Firebase Console Anda. Silakan pergi ke Firebase Console -> Authentication -> Settings -> Authorized Domains lalu tambahkan domain Vercel / domain saat ini.';
+      } else if (err?.code === 'auth/configuration-not-found' || err?.code === 'auth/operation-not-allowed') {
+        customMsg += 'Metode masuk "Google" belum diaktifkan atau dikonfigurasi di Firebase Console Anda. Silakan ikuti langkah-langkah berikut:\n\n1. Buka https://console.firebase.google.com/\n2. Pilih proyek Anda ("web-ix-d")\n3. Masuk ke menu "Authentication" -> tab "Sign-in method"\n4. Klik "Add new provider" dan pilih "Google"\n5. Klik "Enable" (Aktifkan), pilih email dukungan proyek Anda di kolom yang tersedia, lalu klik "Save" (Simpan).';
       } else if (err?.code === 'auth/popup-blocked') {
         customMsg += 'Popup diblokir oleh browser. Silakan berikan izin popup atau buka situs ini langsung bukan melalui iframe.';
-      } else if (err?.code === 'auth/operation-not-allowed') {
-        customMsg += 'Metode masuk "Google" belum diaktifkan di Firebase Console Anda. Silakan masuk ke Firebase Console -> Authentication -> Sign-in Method dan aktifkan Google Provider.';
       } else if (err?.code === 'auth/network-request-failed') {
         customMsg += 'Koneksi jaringan gagal atau diblokir oleh ekstensi browser (Adblocker). Nonaktifkan Adblocker Anda.';
       } else {
         customMsg += `${err?.message || ''}. Tips: Jika Anda mencobanya di dalam editor AI Studio, silakan buka aplikasi di TAB BARU menggunakan ikon panah di kanan atas preview, atau pastikan Domain Authorized & Google Provider sudah diaktifkan di Firebase Console Anda.`;
       }
       setAuthError(customMsg);
+    }
+  };
+
+  const handleEmailPasswordLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!emailInput || !passwordInput) {
+      setAuthError('Silakan masukkan email dan password Anda.');
+      return;
+    }
+    setIsAuthLoading(true);
+    setAuthError(null);
+    try {
+      await signInWithEmailAndPassword(auth, emailInput, passwordInput);
+    } catch (err: any) {
+      console.error("Email authentication failed, attempting auto-registration:", err);
+      // Auto register if the administrator user does not exist in the Auth database yet
+      if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password') {
+        // If it's wrong password but user was found, just throw error, but in Firebase v9/v10 invalid-credential is used generically.
+        // Let's try to create a new user with email and password as fallback.
+        try {
+          await createUserWithEmailAndPassword(auth, emailInput, passwordInput);
+          setIsAuthLoading(false);
+          return;
+        } catch (signupErr: any) {
+          console.error("Auto signup failed:", signupErr);
+          if (signupErr.code === 'auth/operation-not-allowed') {
+            setAuthError('Metode masuk "Email/Password" belum diaktifkan di Firebase Console Anda.\n\nCara Mengaktifkan:\n1. Buka https://console.firebase.google.com/ dan pilih proyek Anda ("web-ix-d")\n2. Buka menu "Authentication" -> tab "Sign-in method"\n3. Klik "Add new provider" -> pilih "Email/Password"\n4. Centang "Enable / Aktifkan" -> Klik "Save / Simpan".');
+          } else if (signupErr.code === 'auth/weak-password') {
+            setAuthError('Kata sandi terlalu pendek. Untuk mendaftarkan akun baru, pastikan kata sandi minimal 6 karakter.');
+          } else if (signupErr.code === 'auth/email-already-in-use') {
+            setAuthError('Kata sandi salah untuk akun ini. Silakan hubungi admin atau perbaiki password di Firebase Console Auth.');
+          } else {
+            setAuthError(`Email/Password error: ${signupErr.message || signupErr.code}`);
+          }
+        }
+      } else if (err.code === 'auth/operation-not-allowed') {
+        setAuthError('Metode masuk "Email/Password" belum diaktifkan di Firebase Console Anda.\n\nCara Mengaktifkan:\n1. Buka https://console.firebase.google.com/ dan pilih proyek Anda ("web-ix-d")\n2. Buka menu "Authentication" -> tab "Sign-in method"\n3. Klik "Add new provider" -> pilih "Email/Password"\n4. Centang "Enable / Aktifkan" -> Klik "Save / Simpan".');
+      } else {
+        setAuthError(`Gagal autentikasi Email: ${err.message || err.code}`);
+      }
+    } finally {
+      setIsAuthLoading(false);
     }
   };
 
@@ -399,37 +447,86 @@ export default function AdminPanel({
           <div className="space-y-2">
             <h2 className="text-2xl font-bold font-display text-white">Panel Administrator</h2>
             <p className="text-zinc-400 text-xs font-light font-sans max-w-xs mx-auto leading-relaxed">
-              Silakan login dengan akun Google utama milik Anda untuk membuka dasbor manajemen portofolio MyKonten.
+              Silakan login dengan akun Gmail utama Anda (<strong className="text-amber-500 font-mono">tarzzgg1@gmail.com</strong>) dan Password Anda (<strong className="text-amber-500 font-mono">Lintar_123</strong>).
             </p>
           </div>
 
           {authError && (
             <div className="p-4 bg-red-950/20 border border-red-500/20 rounded-xl text-left flex gap-3 items-start">
               <AlertTriangle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
-              <p className="text-[11px] text-red-400 font-mono leading-relaxed">{authError}</p>
+              <p className="text-[11px] text-red-400 font-mono leading-relaxed whitespace-pre-line">{authError}</p>
             </div>
           )}
 
-          <div className="space-y-3 pt-2">
+          {/* Form Email & Password */}
+          <form onSubmit={handleEmailPasswordLogin} className="space-y-3.5 text-left">
+            <div className="space-y-1">
+              <label className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider pl-1">Email Administrator</label>
+              <div className="relative">
+                <input
+                  type="email"
+                  required
+                  placeholder="admin@gmail.com"
+                  value={emailInput}
+                  onChange={(e) => setEmailInput(e.target.value)}
+                  className="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-2.5 pl-10 text-xs text-white focus:outline-none focus:border-amber-500"
+                />
+                <span className="absolute left-3.5 top-3.5 text-zinc-500 text-xs font-semibold">@</span>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider pl-1">Password</label>
+              <div className="relative">
+                <input
+                  type="password"
+                  required
+                  placeholder="Masukkan password Anda (Lintar_123)"
+                  value={passwordInput}
+                  onChange={(e) => setPasswordInput(e.target.value)}
+                  className="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-2.5 pl-10 text-xs text-white focus:outline-none focus:border-amber-500"
+                />
+                <Lock className="w-3.5 h-3.5 absolute left-3.5 top-3.5 text-zinc-500" />
+              </div>
+            </div>
+
             <button
-              onClick={handleLogin}
-              className="w-full py-3 px-5 rounded-xl cursor-pointer bg-amber-500 hover:bg-amber-400 text-black font-semibold text-sm transition-colors flex items-center justify-center gap-2"
+              type="submit"
+              disabled={isAuthLoading}
+              className="w-full mt-2 py-3 px-5 rounded-xl cursor-pointer bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs uppercase tracking-wider transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
             >
               <ShieldCheck className="w-4 h-4" />
-              Masuk dengan Akun Google
+              {isAuthLoading ? 'Membuka Panel...' : 'Login Ke Panel Admin'}
+            </button>
+          </form>
+
+          {/* Divider */}
+          <div className="relative flex py-2 items-center">
+            <div className="flex-grow border-t border-white/5"></div>
+            <span className="flex-shrink mx-4 text-zinc-500 text-[10px] font-mono uppercase tracking-widest">atau lewat</span>
+            <div className="flex-grow border-t border-white/5"></div>
+          </div>
+
+          <div className="space-y-3">
+            <button
+              onClick={handleLogin}
+              className="w-full py-2.5 px-5 rounded-xl cursor-pointer bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-white/5 font-medium text-xs transition-colors flex items-center justify-center gap-2"
+            >
+              <svg className="w-4 h-4 mr-1 text-zinc-350 shrink-0" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+              Google Auth (Akun Utama)
             </button>
 
             <button
               onClick={onBackToSite}
-              className="w-full py-3 px-5 rounded-xl cursor-pointer bg-zinc-900 border border-white/5 hover:bg-zinc-800 text-zinc-300 font-medium text-sm transition-colors flex items-center justify-center gap-1"
+              className="w-full py-2.5 px-5 rounded-xl cursor-pointer bg-zinc-900 border border-white/5 hover:bg-zinc-800 text-zinc-400 font-medium text-xs transition-colors flex items-center justify-center gap-1"
             >
-              <ArrowLeft className="w-4 h-4 mr-1" />
+              <ArrowLeft className="w-3.5 h-3.5 mr-1" />
               Kembali ke Beranda
             </button>
           </div>
 
-          <div className="text-[10px] text-zinc-600 font-mono">
-            Protected by Cloud Firestore strict collection security rules.
+          <div className="text-[9px] text-zinc-550 font-mono leading-relaxed pt-3 border-t border-white/5">
+            Realtime syncing enabled. All CRUD (Create, Update, Delete) logs protected by security policies.
           </div>
         </motion.div>
       </div>

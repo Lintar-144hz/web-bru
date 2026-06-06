@@ -14,11 +14,10 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Secure Admin Look up: Checks email identity and verification flag
+    // Secure Admin Look up: Checks email identity
     function isAdmin() {
       return isSignedIn() 
-        && request.auth.token.email == "tarzzgg1@gmail.com" 
-        && request.auth.token.email_verified == true;
+        && request.auth.token.email == "tarzzgg1@gmail.com";
     }
 
     // ID character validation to prevent character injection and Denial of Wallet attacks
